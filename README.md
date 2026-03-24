@@ -21,6 +21,15 @@
 - Executive synthesis 흐름
 - 실시간 runtime trace / status UI
 
+## 참고 자료
+
+이 저장소의 구현 방향과 일부 설계 기준은 아래 자료를 참고했습니다.
+
+- [TDC ADMET Benchmark Group Overview](https://tdcommons.ai/benchmark/admet_group/overview/)
+  - TDC ADMET 22 신호 세트와 prediction registry 확장 기준
+- [Agentic AI 기반 신약 개발 워크플로 자동화: AWS 해커톤에서 입증한 SK바이오팜 참가팀의 도전 사례](https://aws.amazon.com/ko/blogs/tech/agentic-ai-drug-development-workflow-automation-challenge/)
+  - agentic workflow 구성, expert 역할 분리, evidence 중심 오케스트레이션 방향 참고
+
 ## 주요 문서
 
 - `architecture_progress_checklist_ko.md`
