@@ -14,6 +14,22 @@ from app.domain.models import EvidenceItem, EvidencePacket
 
 PUBCHEM_BASE = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
 TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9\-]{1,}")
+_COMPOUND_DESCRIPTOR_TOKENS = frozenset(
+    {
+        "analog",
+        "analogs",
+        "analogue",
+        "analogues",
+        "derivative",
+        "derivatives",
+        "scaffold",
+        "series",
+        "candidate",
+        "compound",
+        "executive",
+        "assessment",
+    }
+)
 
 
 class PubChemClient:
@@ -40,6 +56,7 @@ class PubChemClient:
         queries: list[str] = []
         if compound_name:
             queries.append(compound_name)
+            queries.extend(self._normalized_compound_name_variants(compound_name))
         if target:
             queries.append(target)
         fallback = self._query_from_question(question)
@@ -62,6 +79,22 @@ class PubChemClient:
 
         encoded_query = quote(query, safe="")
         payload = self._request_json(f"{PUBCHEM_BASE}/name/{encoded_query}/cids/JSON", {})
+        cids = payload.get("IdentifierList", {}).get("CID", [])
+        if not isinstance(cids, list):
+            cids = []
+
+        results = [str(cid) for cid in cids[:retmax]]
+        self.cache.set(cache_key, results)
+        return results
+
+    def search_pubchem_by_smiles(self, smiles: str, retmax: int = 10) -> list[str]:
+        cache_key = f"pubchem:search:smiles:{smiles}:{retmax}"
+        cached = self.cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
+        encoded_smiles = quote(smiles, safe="")
+        payload = self._request_json(f"{PUBCHEM_BASE}/smiles/{encoded_smiles}/cids/JSON", {})
         cids = payload.get("IdentifierList", {}).get("CID", [])
         if not isinstance(cids, list):
             cids = []
@@ -166,6 +199,7 @@ class PubChemClient:
         question_type: str,
         target: str | None = None,
         compound_name: str | None = None,
+        smiles: str | None = None,
         retmax: int = 10,
         top_k: int = 5,
     ) -> EvidencePacket:
@@ -206,6 +240,35 @@ class PubChemClient:
                     items=scored[:top_k],
                     source_health="ok",
                 )
+
+            if smiles:
+                active_query = f"smiles_identity:{smiles}"
+                try:
+                    cids = self.search_pubchem_by_smiles(smiles, retmax=retmax)
+                except HTTPError as exc:
+                    if not self._is_not_found_error(exc):
+                        return self._failure_packet(
+                            query=active_query,
+                            missing_reason="pubchem_request_failed",
+                            exc=exc,
+                        )
+                    cids = []
+
+                if cids:
+                    compounds = self.fetch_pubchem_compounds(cids)
+                    items = [self.normalize_pubchem_compound(compound) for compound in compounds]
+                    scored = [
+                        replace(item, score=self.score_pubchem_evidence(item, question, target=target))
+                        for item in items
+                    ]
+                    scored.sort(key=lambda item: item.score, reverse=True)
+
+                    return EvidencePacket(
+                        source="pubchem",
+                        query=active_query,
+                        items=scored[:top_k],
+                        source_health="ok",
+                    )
         except (HTTPError, URLError) as exc:
             return self._failure_packet(
                 query=active_query,
@@ -256,3 +319,20 @@ class PubChemClient:
 
     def _tokenize(self, text: str) -> set[str]:
         return {token.lower() for token in TOKEN_RE.findall(text or "")}
+
+    def _normalized_compound_name_variants(self, compound_name: str) -> list[str]:
+        raw_tokens = [token for token in re.split(r"\s+", compound_name.strip()) if token]
+        if len(raw_tokens) <= 1:
+            return []
+
+        trimmed = list(raw_tokens)
+        while trimmed and trimmed[-1].lower() in _COMPOUND_DESCRIPTOR_TOKENS:
+            trimmed.pop()
+
+        if not trimmed or trimmed == raw_tokens:
+            return []
+
+        normalized = " ".join(trimmed).strip()
+        if not normalized or normalized == compound_name:
+            return []
+        return [normalized]

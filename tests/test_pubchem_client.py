@@ -153,6 +153,105 @@ def test_collect_pubchem_evidence_uses_fallback_queries(monkeypatch) -> None:
     assert searched_queries[:2] == ["ABC-101", "KRAS G12C"]
 
 
+def test_build_query_candidates_adds_normalized_compound_name_variant() -> None:
+    client = make_client()
+
+    queries = client.build_query_candidates(
+        question="executive assessment for axitinib analog against VEGFR2",
+        question_type="multi_expert",
+        target="VEGFR2",
+        compound_name="Axitinib analog",
+    )
+
+    assert queries[:3] == ["Axitinib analog", "Axitinib", "VEGFR2"]
+
+
+def test_collect_pubchem_evidence_uses_normalized_compound_name_variant(monkeypatch) -> None:
+    client = make_client()
+    searched_queries: list[str] = []
+
+    def fake_search(query: str, retmax: int = 10) -> list[str]:
+        searched_queries.append(query)
+        if query == "Axitinib":
+            return ["6450551"]
+        return []
+
+    monkeypatch.setattr(client, "search_pubchem", fake_search)
+    monkeypatch.setattr(
+        client,
+        "fetch_pubchem_compounds",
+        lambda cids: [
+            {
+                "cid": "6450551",
+                "title": "Axitinib",
+                "formula": "C22H18N4OS",
+                "xlogp": 3.1,
+                "tpsa": 74.1,
+                "smiles": "COc1cc2ncnc(Nc3ccc(S(C)(=O)=O)cc3F)c2cc1OCC1CC1",
+            }
+        ],
+    )
+
+    packet = client.collect_pubchem_evidence(
+        question="executive assessment for axitinib analog against VEGFR2",
+        question_type="multi_expert",
+        target="VEGFR2",
+        compound_name="Axitinib analog",
+        top_k=2,
+    )
+
+    assert packet.source_health == "ok"
+    assert packet.query == "Axitinib"
+    assert packet.items[0].title == "Axitinib"
+    assert searched_queries[:2] == ["Axitinib analog", "Axitinib"]
+
+
+def test_collect_pubchem_evidence_uses_smiles_identity_when_text_queries_miss(monkeypatch) -> None:
+    client = make_client()
+    searched_queries: list[str] = []
+    searched_smiles: list[str] = []
+
+    def fake_search(query: str, retmax: int = 10) -> list[str]:
+        searched_queries.append(query)
+        return []
+
+    def fake_search_by_smiles(smiles: str, retmax: int = 10) -> list[str]:
+        searched_smiles.append(smiles)
+        return ["702"]
+
+    monkeypatch.setattr(client, "search_pubchem", fake_search)
+    monkeypatch.setattr(client, "search_pubchem_by_smiles", fake_search_by_smiles)
+    monkeypatch.setattr(
+        client,
+        "fetch_pubchem_compounds",
+        lambda cids: [
+            {
+                "cid": "702",
+                "title": "Ethanol",
+                "formula": "C2H6O",
+                "xlogp": -0.3,
+                "tpsa": 20.2,
+                "smiles": "CCO",
+            }
+        ],
+    )
+
+    packet = client.collect_pubchem_evidence(
+        question="executive assessment for ABC-101 against KRAS G12C",
+        question_type="multi_expert",
+        target="KRAS G12C",
+        compound_name="ABC-101",
+        smiles="CCO",
+        top_k=2,
+    )
+
+    assert packet.source_health == "ok"
+    assert packet.query == "smiles_identity:CCO"
+    assert packet.items[0].title == "Ethanol"
+    assert searched_queries[:3] == ["ABC-101", "KRAS G12C", "abc-101 against assessment executive for g12c kras"]
+    assert searched_smiles == ["CCO"]
+
+
 def test_collect_pubchem_evidence_returns_missing_reason_when_no_hits(monkeypatch) -> None:
     client = make_client()
     monkeypatch.setattr(client, "search_pubchem", lambda query, retmax=10: [])

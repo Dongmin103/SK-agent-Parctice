@@ -108,6 +108,8 @@
 - `[x]` source health / partial failure 통합 처리
   - 2026-03-24 PubChem/ChEMBL/ClinicalTrials/openFDA hardening: `URLError`/`JSONDecodeError`를 source-specific degraded packet으로 분류하고 `diagnostics.error_type`을 추가했으며, score 갱신을 `dataclasses.replace(...)`로 통일
   - 2026-03-24 PubChem/openFDA hardening: `HTTPError 404`는 upstream failure가 아니라 no-hit로 분류하고 다음 fallback query를 계속 시도하도록 수정
+  - 2026-03-24 PubChem query normalization hardening: `Axitinib analog` 같은 compound name에서 trailing descriptor를 걷어낸 variant를 fallback candidate로 추가해 strict name lookup hit율을 보강
+  - 2026-03-24 PubChem SMILES passthrough hardening: consult/executive가 canonical SMILES를 evidence layer로 전달하고, name query가 모두 miss면 PubChem identity search를 `smiles_identity:<canonical_smiles>`로 재시도하도록 연결
 
 ### D. Query Planning / Routing 계층
 

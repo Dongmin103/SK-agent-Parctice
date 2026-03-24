@@ -65,18 +65,17 @@ class EvidenceCoordinator:
         question_type: str,
         target: str | None = None,
         compound_name: str | None = None,
+        smiles: str | None = None,
         retmax: int = 10,
         top_k: int = 5,
     ) -> EvidenceBundle:
         packets = {
-            "pubchem": self._collect_source(
-                source="pubchem",
-                client=self.pubchem_client,
-                method_name="collect_pubchem_evidence",
+            "pubchem": self._collect_pubchem_source(
                 question=question,
                 question_type=question_type,
                 target=target,
                 compound_name=compound_name,
+                smiles=smiles,
                 retmax=retmax,
                 top_k=top_k,
             ),
@@ -166,6 +165,47 @@ class EvidenceCoordinator:
                 diagnostics={"sources": ",".join(failed_sources)} if failed_sources else {},
             )
         return packets
+
+    def _collect_pubchem_source(
+        self,
+        *,
+        question: str,
+        question_type: str,
+        target: str | None,
+        compound_name: str | None,
+        smiles: str | None,
+        retmax: int,
+        top_k: int,
+    ) -> EvidencePacket:
+        if self.pubchem_client is None:
+            return EvidencePacket(
+                source="pubchem",
+                query=compound_name or target or question,
+                items=[],
+                source_health="degraded",
+                missing_reason="pubchem_client_unavailable",
+                diagnostics={"error": "client unavailable"},
+            )
+
+        try:
+            return self.pubchem_client.collect_pubchem_evidence(
+                question,
+                question_type,
+                target=target,
+                compound_name=compound_name,
+                smiles=smiles,
+                retmax=retmax,
+                top_k=top_k,
+            )
+        except Exception as exc:
+            return EvidencePacket(
+                source="pubchem",
+                query=compound_name or target or question,
+                items=[],
+                source_health="degraded",
+                missing_reason="pubchem_request_failed",
+                diagnostics={"error": str(exc)},
+            )
 
     def _collect_source(
         self,

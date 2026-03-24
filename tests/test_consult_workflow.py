@@ -46,6 +46,7 @@ class StubEvidenceCoordinator:
     def __init__(self, bundle: EvidenceBundle, domain_packets: dict[str, EvidencePacket]) -> None:
         self.bundle = bundle
         self.domain_packets = domain_packets
+        self.collect_calls: list[dict[str, object]] = []
 
     def collect_evidence(
         self,
@@ -54,9 +55,21 @@ class StubEvidenceCoordinator:
         question_type: str,
         target: str | None = None,
         compound_name: str | None = None,
+        smiles: str | None = None,
         retmax: int = 10,
         top_k: int = 5,
     ) -> EvidenceBundle:
+        self.collect_calls.append(
+            {
+                "question": question,
+                "question_type": question_type,
+                "target": target,
+                "compound_name": compound_name,
+                "smiles": smiles,
+                "retmax": retmax,
+                "top_k": top_k,
+            }
+        )
         return self.bundle
 
     def build_domain_packets(self, bundle: EvidenceBundle) -> dict[str, EvidencePacket]:
@@ -192,6 +205,7 @@ def test_consult_workflow_preserves_router_selection_order_and_domain_packet_map
     assert workflow.harvey_agent.calls[0]["evidence_packet"] == clinical_packet
     assert workflow.house_agent.calls[0]["evidence_packet"] == safety_packet
     assert workflow.walter_agent.calls == []
+    assert workflow.evidence_coordinator.collect_calls[0]["smiles"] == "CCO"
 
 
 def test_consult_workflow_keeps_successful_findings_when_one_selected_agent_fails() -> None:

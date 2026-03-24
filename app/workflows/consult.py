@@ -134,6 +134,7 @@ class ConsultWorkflow:
             question_type=routing.question_type,
             target=target,
             compound_name=compound_name,
+            smiles=compound_context.canonical_smiles or compound_context.smiles,
             retmax=self.retmax,
             top_k=self.top_k,
         )

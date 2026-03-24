@@ -260,6 +260,43 @@ def test_evidence_coordinator_returns_degraded_bundle_when_all_sources_miss() ->
     ]
 
 
+def test_evidence_coordinator_passes_smiles_to_pubchem_client() -> None:
+    pubchem_client = StubPubChemClient(
+        EvidencePacket(
+            source="pubchem",
+            query="smiles_identity:CCO",
+            items=[],
+            source_health="degraded",
+            missing_reason="no_pubchem_hits",
+        )
+    )
+    coordinator = EvidenceCoordinator(
+        pubmed_client=StubPubMedClient(
+            EvidencePacket(source="pubmed", query="q", items=[], source_health="degraded")
+        ),
+        pubchem_client=pubchem_client,
+        chembl_client=StubChEMBLClient(
+            EvidencePacket(source="chembl", query="q", items=[], source_health="degraded")
+        ),
+        clinicaltrials_client=StubClinicalTrialsClient(
+            packet=EvidencePacket(source="clinicaltrials", query="q", items=[], source_health="degraded")
+        ),
+        openfda_client=StubOpenFDAClient(
+            EvidencePacket(source="openfda", query="q", items=[], source_health="degraded")
+        ),
+    )
+
+    coordinator.collect_evidence(
+        question="executive assessment for ABC-101 against KRAS G12C",
+        question_type="multi_expert",
+        target="KRAS G12C",
+        compound_name="ABC-101",
+        smiles="CCO",
+    )
+
+    assert pubchem_client.calls[0]["smiles"] == "CCO"
+
+
 def test_evidence_coordinator_builds_domain_packets_for_expert_workflows() -> None:
     coordinator = EvidenceCoordinator(
         pubmed_client=StubPubMedClient(

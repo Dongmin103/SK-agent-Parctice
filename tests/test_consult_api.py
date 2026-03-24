@@ -73,6 +73,7 @@ class StubEvidenceCoordinator:
         question_type: str,
         target: str | None = None,
         compound_name: str | None = None,
+        smiles: str | None = None,
         retmax: int = 10,
         top_k: int = 5,
     ) -> EvidenceBundle:
@@ -82,6 +83,7 @@ class StubEvidenceCoordinator:
                 "question_type": question_type,
                 "target": target,
                 "compound_name": compound_name,
+                "smiles": smiles,
                 "retmax": retmax,
                 "top_k": top_k,
             }
@@ -363,6 +365,7 @@ def test_post_consult_report_wires_existing_agents_and_returns_response() -> Non
             "question_type": "safety_pk",
             "target": "KRAS G12C",
             "compound_name": "ABC-101",
+            "smiles": "CCO",
             "retmax": 10,
             "top_k": 5,
         }

@@ -50,6 +50,7 @@ class StubEvidenceCoordinator:
         question_type: str,
         target: str | None = None,
         compound_name: str | None = None,
+        smiles: str | None = None,
         retmax: int = 10,
         top_k: int = 5,
     ) -> EvidenceBundle:
@@ -59,6 +60,7 @@ class StubEvidenceCoordinator:
                 "question_type": question_type,
                 "target": target,
                 "compound_name": compound_name,
+                "smiles": smiles,
                 "retmax": retmax,
                 "top_k": top_k,
             }
@@ -218,6 +220,7 @@ def test_executive_workflow_runs_all_experts_and_synthesizes_decision() -> None:
             "question_type": "multi_expert",
             "target": "KRAS G12C",
             "compound_name": "ABC-101",
+            "smiles": canonical_smiles,
             "retmax": 10,
             "top_k": 5,
         }
